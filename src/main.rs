@@ -22,13 +22,11 @@ fn handle_connection(mut stream: TcpStream) {
     let mut reader = BufReader::new(&stream);
     let mut request_line = String::new();
 
-    // Read the request line (first line of the HTTP request)
     if let Err(e) = reader.read_line(&mut request_line) {
         eprintln!("Failed to read from stream: {}", e);
         return;
     }
 
-    // Parse the request line
     let parts: Vec<&str> = request_line.trim().split_whitespace().collect();
     if parts.len() < 3 {
         eprintln!("Invalid HTTP request line: {}", request_line);
