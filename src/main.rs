@@ -42,8 +42,8 @@ fn handle_connection(mut stream: TcpStream) {
         stream.write("HTTP/1.1 200 OK\r\n\r\n".as_bytes()).unwrap();
 
     } else if path.starts_with("/echo") {
-        let temp = path.trim_start_matches("/echo/");
-        let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}", temp.len(), temp);        
+        let temp = path.strip_prefix("/echo/");
+        let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}", temp.unwrap().len(), temp.unwrap());        
         stream.write(response.as_bytes()).unwrap();
     }
     else {
