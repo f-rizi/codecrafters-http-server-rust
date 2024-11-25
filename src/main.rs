@@ -39,7 +39,7 @@ fn handle_connection(mut stream: TcpStream) {
     println!("Method: {}, Path: {}", method, path);
 
     if path.starts_with("/") {
-        stream.write("HTTP/1.1 200 OK\r\n\r\n".as_bytes());
+        stream.write("HTTP/1.1 200 OK\r\n\r\n".as_bytes()).unwrap();
 
     } else if path.starts_with("/echo") {
         let temp = path.trim_start_matches("/echo/");
