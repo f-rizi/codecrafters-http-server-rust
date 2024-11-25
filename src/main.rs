@@ -38,13 +38,14 @@ fn handle_connection(mut stream: TcpStream) {
 
     println!("Method: {}, Path: {}", method, path);
 
-    if path.starts_with("/") {
-        stream.write("HTTP/1.1 200 OK\r\n\r\n".as_bytes()).unwrap();
-
-    } else if path.starts_with("/echo") {
+    if path.starts_with("/echo/") {
         let temp = path.strip_prefix("/echo/");
         let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}", temp.unwrap().len(), temp.unwrap());        
         stream.write(response.as_bytes()).unwrap();
+    }
+    else if path.starts_with("/") {
+        stream.write("HTTP/1.1 200 OK\r\n\r\n".as_bytes()).unwrap();
+
     }
     else {
         
