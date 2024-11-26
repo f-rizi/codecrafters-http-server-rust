@@ -2,14 +2,21 @@
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 use std::io::{BufRead, BufReader};
+use std::thread;
+use std::time::Duration;
+
+use codecrafters_http_server::ThreadPool;
 
 fn main() {    
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
+    let pool = ThreadPool::new(4);
     
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                handle_connection(stream);
+                pool.execute(move || {
+                    handle_Request(stream);
+                });
             }
             Err(e) => {
                 println!("error: {}", e);
@@ -18,12 +25,43 @@ fn main() {
     }
 }
 
-fn handle_connection(mut stream: TcpStream) {
-    let mut reader: BufReader<&TcpStream> = BufReader::new(&stream);
-    handle_Request(&mut stream);
+fn handle_Request(mut stream: TcpStream) {
+    let request = get_request_lines(&mut stream);
+
+    // Ensure the first line is present
+    let parts = match request.get(0) {
+        Some(line) => line.trim().split_whitespace().collect::<Vec<&str>>(),
+        None => {
+            let response = "HTTP/1.1 400 Bad Request\r\n\r\nMalformed Request";
+            stream.write_all(response.as_bytes()).unwrap();
+            return;
+        }
+    };
+
+    // Ensure the request line has enough parts
+    if parts.len() < 2 {
+        let response = "HTTP/1.1 400 Bad Request\r\n\r\nMalformed Request";
+        stream.write_all(response.as_bytes()).unwrap();
+        return;
+    }
+
+    let path = parts[1];
+
+    if path.starts_with("/user-agent") {
+        handle_user_agent_request(request, &mut stream);
+    } else if path.starts_with("/echo/") {
+        handle_echo_request(path.to_string(), &mut stream);
+    } else if path.starts_with("/sleep") {
+        handle_sleep_request(&mut stream);
+    } else if path == "/" {
+        stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n").unwrap();
+    } else {
+        stream.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").unwrap();
+    }
 }
 
-fn handle_Request(stream: &mut TcpStream) {
+
+fn handle_Request2(stream: &mut TcpStream) {
     let request = get_request_lines(stream);
     let parts: Vec<&str> = request.get(0).unwrap().trim().split_whitespace().collect();
 
@@ -35,12 +73,20 @@ fn handle_Request(stream: &mut TcpStream) {
     else if path.starts_with("/echo/") {
         handle_echo_request(path.to_string(), stream);
     }
+    else if path.starts_with("/sleep") {
+        handle_sleep_request(stream);
+    }
     else if path.eq("/") {
         stream.write("HTTP/1.1 200 OK\r\n\r\n".as_bytes()).unwrap();
     }
     else {
         stream.write("HTTP/1.1 404 Not Found\r\n\r\n".as_bytes()).unwrap();
     }
+}
+
+fn handle_sleep_request(stream: &mut TcpStream) {
+    thread::sleep(Duration::from_secs(5));
+    stream.write("HTTP/1.1 404 Not Found\r\n\r\n".as_bytes()).unwrap();
 }
 
 fn handle_user_agent_request(request: Vec<String>, stream: &mut TcpStream) {
