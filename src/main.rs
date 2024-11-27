@@ -1,11 +1,14 @@
 #[allow(unused_imports)]
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::thread;
 use std::time::Duration;
 
 use codecrafters_http_server::ThreadPool;
+use std::env;
+use std::fs;
+use std::fs::File;
 
 fn main() {    
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
@@ -23,7 +26,7 @@ fn main() {
             }
         }
     }
-    
+
 }
 
 fn handle_Request(mut stream: TcpStream) {
@@ -50,10 +53,16 @@ fn handle_Request(mut stream: TcpStream) {
 
     if path.starts_with("/user-agent") {
         handle_user_agent_request(request, &mut stream);
+    
     } else if path.starts_with("/echo/") {
         handle_echo_request(path.to_string(), &mut stream);
+    
     } else if path.starts_with("/sleep") {
         handle_sleep_request(&mut stream);
+    }
+    else if path.starts_with("/files"){
+        handle_read_file(path.to_string(), &mut stream);
+
     } else if path == "/" {
         stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n").unwrap();
     } else {
@@ -61,28 +70,34 @@ fn handle_Request(mut stream: TcpStream) {
     }
 }
 
+fn handle_read_file(path: String,stream: &mut TcpStream) {
+    if path.starts_with("/files/foo") {
+        let parts = path.split("/").collect::<Vec<&str>>();
+        let mut owned_string: String = "/tmp/".to_owned();
+        let mut file_path = owned_string.push_str(parts[2]);
+        let path2 = "/tmp/foo";
+        let greeting_file_result = File::open(path2);
+        let mut contents = String::new();
 
-fn handle_Request2(stream: &mut TcpStream) {
-    let request = get_request_lines(stream);
-    let parts: Vec<&str> = request.get(0).unwrap().trim().split_whitespace().collect();
+        let mut greeting_file = match greeting_file_result {
+            Ok(file) => {
+                file
+            },
+        
+            Err(error) => {
+                panic!("Problem opening the file: {error:?}")
+            },
+        };
 
-    let path = parts[1];
-
-    if path.starts_with("/user-agent") {
-        handle_user_agent_request(request, stream);
-    }
-    else if path.starts_with("/echo/") {
-        handle_echo_request(path.to_string(), stream);
-    }
-    else if path.starts_with("/sleep") {
-        handle_sleep_request(stream);
-    }
-    else if path.eq("/") {
-        stream.write("HTTP/1.1 200 OK\r\n\r\n".as_bytes()).unwrap();
+        greeting_file.read_to_string(&mut contents);
+        let response = format!("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {}\r\n\r\n{}", contents.chars().count(), contents);        
+        stream.write(response.as_bytes()).unwrap();
     }
     else {
-        stream.write("HTTP/1.1 404 Not Found\r\n\r\n".as_bytes()).unwrap();
+        let response = format!("HTTP/1.1 404 Not Found\r\n\r\n");        
+        stream.write(response.as_bytes()).unwrap();        
     }
+    
 }
 
 fn handle_sleep_request(stream: &mut TcpStream) {
