@@ -18,7 +18,7 @@ fn main() {
         match stream {
             Ok(stream) => {
                 pool.execute(move || {
-                    handle_Request(stream);
+                    handle_request(stream);
                 });
             }
             Err(e) => {
@@ -29,7 +29,7 @@ fn main() {
 
 }
 
-fn handle_Request(mut stream: TcpStream) {
+fn handle_request(mut stream: TcpStream) {
     let request = get_request_lines(&mut stream);
 
     // Ensure the first line is present
@@ -49,8 +49,15 @@ fn handle_Request(mut stream: TcpStream) {
         return;
     }
 
+    let method = parts[0];
     let path = parts[1];
 
+    if method.eq("GET") {
+        handle_get_request(path.to_string(), stream, request);
+    }
+}
+
+fn handle_get_request(path: String, mut stream: TcpStream, request: Vec<String>) {
     if path.starts_with("/user-agent") {
         handle_user_agent_request(request, &mut stream);
     
