@@ -71,33 +71,30 @@ fn handle_Request(mut stream: TcpStream) {
 }
 
 fn handle_read_file(path: String,stream: &mut TcpStream) {
-    if path.starts_with("/files/foo") {
-        let parts = path.split("/").collect::<Vec<&str>>();
-        let mut owned_string: String = "/tmp/".to_owned();
-        let mut file_path = owned_string.push_str(parts[2]);
-        let path2 = "/tmp/foo";
-        let greeting_file_result = File::open(path2);
-        let mut contents = String::new();
+    let parts = path.split("/").collect::<Vec<&str>>();
 
-        let mut greeting_file = match greeting_file_result {
-            Ok(file) => {
-                file
-            },
-        
-            Err(error) => {
-                panic!("Problem opening the file: {error:?}")
-            },
-        };
-
-        greeting_file.read_to_string(&mut contents);
-        let response = format!("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {}\r\n\r\n{}", contents.chars().count(), contents);        
-        stream.write(response.as_bytes()).unwrap();
-    }
-    else {
+    if parts.len() < 3 {
         let response = format!("HTTP/1.1 404 Not Found\r\n\r\n");        
-        stream.write(response.as_bytes()).unwrap();        
+        stream.write(response.as_bytes()).unwrap();    
+        return;
     }
+
+    let file_path = format!("/tmp/{}", parts[2]);
+    let file_open_result = File::open(file_path);
+    let mut contents = String::new();
+
+    match file_open_result {
+        Ok(mut file) => {
+            file.read_to_string(&mut contents);
+            let response = format!("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {}\r\n\r\n{}", contents.chars().count(), contents);        
+            stream.write(response.as_bytes()).unwrap();
+        },
     
+        Err(error) => {
+            let response = format!("HTTP/1.1 404 Not Found\r\n\r\n");        
+            stream.write(response.as_bytes()).unwrap();    
+        },
+    }   
 }
 
 fn handle_sleep_request(stream: &mut TcpStream) {
