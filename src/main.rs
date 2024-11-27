@@ -79,7 +79,7 @@ fn handle_read_file(path: String,stream: &mut TcpStream) {
         return;
     }
 
-    let file_path = format!("/tmp/{}", parts[2]);
+    let file_path = format!("/tmp/data/codecrafters.io/http-server-tester/{}", parts[2]);
     let file_open_result = File::open(file_path);
     let mut contents = String::new();
 
