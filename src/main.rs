@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 #[allow(unused_imports)]
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
@@ -26,40 +27,51 @@ fn main() {
             }
         }
     }
-
 }
 
 fn handle_request(mut stream: TcpStream) {
-    let request = get_request_lines(&mut stream);
+    let request =  get_request_lines(&mut stream);
 
-    // Ensure the first line is present
-    let parts = match request.get(0) {
-        Some(line) => line.trim().split_whitespace().collect::<Vec<&str>>(),
-        None => {
-            let response = "HTTP/1.1 400 Bad Request\r\n\r\nMalformed Request";
-            stream.write_all(response.as_bytes()).unwrap();
-            return;
-        }
-    };
-
-    // Ensure the request line has enough parts
-    if parts.len() < 2 {
-        let response = "HTTP/1.1 400 Bad Request\r\n\r\nMalformed Request";
-        stream.write_all(response.as_bytes()).unwrap();
-        return;
-    }
-
-    let method = parts[0];
-    let path = parts[1];
+    let method = request.0.get("method").unwrap();
+    let path = request.0.get("path").unwrap();
 
     if method.eq("GET") {
-        handle_get_request(path.to_string(), stream, request);
+        handle_get_request(path.to_string(), stream /*, request_lines */);
+    }
+    else if method.eq("POST") {
+        handle_post_request(path.to_string(), stream , request.0, request.1);
     }
 }
 
-fn handle_get_request(path: String, mut stream: TcpStream, request: Vec<String>) {
+fn handle_post_request(path: String, mut stream: TcpStream, request: HashMap<String, String>, body: Vec<u8>) {
+    if path.starts_with("/files"){
+        handle_save_files(path.to_string(), &mut stream, body);
+
+    } else if path == "/" {
+        stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n").unwrap();
+    } else {
+        stream.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").unwrap();
+    }
+}
+
+fn handle_save_files(path: String, stream: &mut TcpStream,  body: Vec<u8>) {
+    let parts = path.split("/").collect::<Vec<&str>>();
+
+    if parts.len() < 3 {
+        let response = format!("HTTP/1.1 404 Not Found\r\n\r\n");        
+        stream.write(response.as_bytes()).unwrap();    
+        return;
+    }
+    let file_path = format!("/tmp/data/codecrafters.io/http-server-tester/{}", parts[2]);
+
+    let mut file = fs::File::create(file_path).unwrap();
+    file.write_all(&body).unwrap();
+    stream.write_all(b"HTTP/1.1 201 Created\r\n\r\n").unwrap();
+}
+
+fn handle_get_request(path: String, mut stream: TcpStream /*, request: Vec<String> */) {
     if path.starts_with("/user-agent") {
-        handle_user_agent_request(request, &mut stream);
+        //handle_user_agent_request(request, &mut stream);
     
     } else if path.starts_with("/echo/") {
         handle_echo_request(path.to_string(), &mut stream);
@@ -132,13 +144,84 @@ fn handle_echo_request(path: String, stream: &mut TcpStream) {
     stream.write(response.as_bytes()).unwrap();
 }
 
-fn get_request_lines(stream: &mut TcpStream) -> Vec<String> {
-    let buf_reader = BufReader::new( stream);
-    let http_request: Vec<_> = buf_reader
+fn get_request_lines(stream: &mut TcpStream) -> (HashMap<String, String>, Vec<u8>) {
+    let mut buf_reader = BufReader::new( stream);
+    let request_lines: Vec<_> = buf_reader
+        .by_ref()
         .lines()
         .map(|result| result.unwrap())
         .take_while(|line| !line.is_empty())
         .collect();
 
-    return http_request;
+    let mut request_parts: HashMap<String, String> = HashMap::new();
+
+    for (pos, line) in request_lines.iter().enumerate(){
+        if pos == 0 {
+            let parts = line.trim().split_whitespace().collect::<Vec<&str>>();
+            request_parts.insert(String::from("method"), String::from(parts[0]));
+            request_parts.insert(String::from("path"), String::from(parts[1]));
+        }
+        else {
+            let parts = line.trim().split(": ").collect::<Vec<&str>>();
+
+            if parts.len() == 2 {
+                let key = String::from(parts[0]);
+                let value = String::from(parts[1]);
+                request_parts.insert(key, value);
+            }
+        }
+    }
+
+    let mut body = Vec::new();
+
+    if request_parts.contains_key("Content-Length") {
+        let content_length = request_parts.get("Content-Length").unwrap().to_string();
+        let length = content_length.parse::<usize>().unwrap_or(0);
+        if length > 0 {
+            let mut buffer = vec![0; length];
+            buf_reader.read_exact(&mut buffer).unwrap();
+            body = buffer;
+        }
+    }
+
+    return (request_parts, body);
 }
+
+/*
+fn create_request(stream: &mut TcpStream) ->  HashMap<String, String> {
+    let request_lines = get_request_lines(stream);
+
+    let mut body = Vec::new();
+    let mut content_length = 0;
+
+    let mut request_parts: HashMap<String, String> = HashMap::new();
+
+    for (pos, line) in request_lines.iter().enumerate(){
+        if pos == 0 {
+            let parts = line.trim().split_whitespace().collect::<Vec<&str>>();
+            request_parts.insert(String::from("method"), String::from(parts[0]));
+            request_parts.insert(String::from("path"), String::from(parts[1]));
+        }
+        else {
+            let parts = line.trim().split(": ").collect::<Vec<&str>>();
+
+            if parts.len() == 2 {
+                let key = String::from(parts[0]);
+                let value = String::from(parts[1]);
+                request_parts.insert(key, value);
+            }
+        }
+    }
+
+    if request_parts.contains_key("Content-Length") {
+        let content_length = request_parts.get("Content-Length").unwrap().to_string();
+        let temp = content_length.parse::<usize>().unwrap_or(0);
+        if temp > 0 {
+            let mut buffer = vec![0; temp];
+            buf_reader.read_exact(&mut buffer).unwrap();
+            body = buffer;
+        }
+    }
+
+    return request_parts;
+}*/
