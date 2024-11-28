@@ -36,7 +36,7 @@ fn handle_request(mut stream: TcpStream) {
     let path = request.0.get("path").unwrap();
 
     if method.eq("GET") {
-        handle_get_request(path.to_string(), stream /*, request_lines */);
+        handle_get_request(path.to_string(), stream, request.0);
     }
     else if method.eq("POST") {
         handle_post_request(path.to_string(), stream , request.0, request.1);
@@ -69,10 +69,9 @@ fn handle_save_files(path: String, stream: &mut TcpStream,  body: Vec<u8>) {
     stream.write_all(b"HTTP/1.1 201 Created\r\n\r\n").unwrap();
 }
 
-fn handle_get_request(path: String, mut stream: TcpStream /*, request: Vec<String> */) {
+fn handle_get_request(path: String, mut stream: TcpStream , request: HashMap<String, String> ) {
     if path.starts_with("/user-agent") {
-        //handle_user_agent_request(request, &mut stream);
-    
+        handle_user_agent_request(request, &mut stream);
     } else if path.starts_with("/echo/") {
         handle_echo_request(path.to_string(), &mut stream);
     
@@ -121,18 +120,11 @@ fn handle_sleep_request(stream: &mut TcpStream) {
     stream.write("HTTP/1.1 404 Not Found\r\n\r\n".as_bytes()).unwrap();
 }
 
-fn handle_user_agent_request(request: Vec<String>, stream: &mut TcpStream) {
-    let mut agent: String = String::from("");
-
-    for item in request {
-        if item.starts_with("User-Agent") {
-            // Split into parts and collect into a vector
-            let parts: Vec<&str> = item.splitn(2, ": ").collect();
-            if parts.len() > 1 {
-                agent = parts[1].to_string(); // Create an owned String
-            }
-        }
-    }
+fn handle_user_agent_request(request: HashMap<String, String>, stream: &mut TcpStream) {
+    let agent: String = request
+    .get("User-Agent")
+    .map(|value| value.to_string()) // Convert the value if it exists
+    .unwrap_or_else(|| String::from(""));
 
     let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}", agent.len(), agent);        
     stream.write(response.as_bytes()).unwrap();
