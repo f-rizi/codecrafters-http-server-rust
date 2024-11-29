@@ -149,7 +149,6 @@ fn handle_echo_request(path: String, stream: &mut TcpStream, request: HashMap<St
         let encodings = encoding.split(", ").collect::<Vec<&str>>();
 
         if encodings.contains(&"gzip") {
-            println!("Gzip encoding is present!");
             let temp_byte = temp.unwrap().as_bytes();
 
             // let mut input = io::stdin();
