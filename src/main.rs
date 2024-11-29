@@ -150,24 +150,16 @@ fn handle_echo_request(path: String, stream: &mut TcpStream, request: HashMap<St
         let encodings = encoding.split(", ").collect::<Vec<&str>>();
 
         if encodings.contains(&"gzip") {
-            let temp_byte = temp.unwrap().as_bytes();
+            let compressed_data = compress_gzip(temp.unwrap().as_bytes());
 
-            let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-            encoder.write_all(temp_byte).expect("Failed to write to encoder");
-            let compressed_bytes = encoder.finish().expect("Failed to finish compression");
- 
-            let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
-            e.write_all(temp_byte).expect("Failed to write to encoder");
-            let compressed_bytes = e.finish().expect("Failed to finish compression");
+            let response_header = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: {}\r\n\r\n",
+                compressed_data.len()
+            );
 
-            // Convert the compressed bytes to a Base64 string
-            let as_string = base64::encode(compressed_bytes);
+            stream.write_all(response_header.as_bytes()).expect("Failed to write response header");
+            stream.write_all(&compressed_data).expect("Failed to write compressed data");
 
-            let response = 
-            format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: {}\r\n\r\n{}", 
-            as_string.len(), 
-            as_string);   
-            stream.write(response.as_bytes()).unwrap();
         }
         else {
             let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n");   
@@ -178,6 +170,12 @@ fn handle_echo_request(path: String, stream: &mut TcpStream, request: HashMap<St
         let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}", temp.unwrap().len(), temp.unwrap());        
         stream.write(response.as_bytes()).unwrap();
     }
+}
+
+fn compress_gzip(data: &[u8]) -> Vec<u8> {
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(data).expect("Failed to write to encoder");
+    encoder.finish().expect("Failed to finish compression")
 }
 
 fn get_request_lines(stream: &mut TcpStream) -> (HashMap<String, String>, Vec<u8>) {
