@@ -167,7 +167,6 @@ fn handle_echo_request(path: String, stream: &mut TcpStream, request: HashMap<St
             as_string.len(), 
             as_string);   
             stream.write(response.as_bytes()).unwrap();
-     
         }
         else {
             let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n");   
