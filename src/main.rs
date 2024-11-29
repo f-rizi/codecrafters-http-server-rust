@@ -171,10 +171,8 @@ fn handle_echo_request(path: String, stream: &mut TcpStream, request: HashMap<St
      
         }
         else {
-            let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}", temp.unwrap().len(), temp.unwrap());   
+            let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n");   
             stream.write(response.as_bytes()).unwrap();
-     
-
         }
     }
     else {
@@ -196,7 +194,7 @@ fn get_request_lines(stream: &mut TcpStream) -> (HashMap<String, String>, Vec<u8
 
     for (pos, line) in request_lines.iter().enumerate(){
         if pos == 0 {
-            
+
             let parts = line.trim().split_whitespace().collect::<Vec<&str>>();
             request_parts.insert(String::from("method"), String::from(parts[0]));
             request_parts.insert(String::from("path"), String::from(parts[1]));
