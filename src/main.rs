@@ -6,6 +6,9 @@ use std::io::{BufRead, BufReader, Read};
 use std::thread;
 use std::time::Duration;
 
+
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use codecrafters_http_server::ThreadPool;
 use std::env;
 use std::fs;
@@ -17,7 +20,6 @@ use std::io;
 use libflate::gzip::Decoder;
 
 use std::io::prelude::*;
-use flate2::Compression;
 use flate2::write::ZlibEncoder;
 
 use base64;
@@ -151,21 +153,16 @@ fn handle_echo_request(path: String, stream: &mut TcpStream, request: HashMap<St
         if encodings.contains(&"gzip") {
             let temp_byte = temp.unwrap().as_bytes();
 
-            // let mut input = io::stdin();
-            // let mut decoder = Decoder::new(&mut input).unwrap();
-            // io::copy(&mut decoder, &mut io::stdout()).unwrap();
- 
-            let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
-            e.write_all(temp_byte).expect("Failed to write to encoder");
-            let compressed_bytes = e.finish().expect("Failed to finish compression");
+            let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+            encoder.write_all(temp_byte).expect("Failed to write to encoder");
+            let compressed_bytes = encoder.finish().expect("Failed to finish compression");
 
-            // Convert the compressed bytes to a Base64 string
-            let as_string = base64::encode(compressed_bytes);
+            let decompressed_data = decompress_gzip(compressed_bytes).expect("Failed to decompress data");
 
             let response = 
             format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: {}\r\n\r\n{}", 
-            as_string.len(), 
-            as_string);   
+            decompressed_data.len(), 
+            decompressed_data);   
             stream.write(response.as_bytes()).unwrap();
         }
         else {
@@ -177,6 +174,13 @@ fn handle_echo_request(path: String, stream: &mut TcpStream, request: HashMap<St
         let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}", temp.unwrap().len(), temp.unwrap());        
         stream.write(response.as_bytes()).unwrap();
     }
+}
+
+fn decompress_gzip(compressed_data: Vec<u8>) -> Result<String, std::io::Error> {
+    let mut decoder = libflate::gzip::Decoder::new(&compressed_data[..])?;
+    let mut decompressed = String::new();
+    decoder.read_to_string(&mut decompressed)?;
+    Ok(decompressed)
 }
 
 fn get_request_lines(stream: &mut TcpStream) -> (HashMap<String, String>, Vec<u8>) {
