@@ -196,6 +196,7 @@ fn get_request_lines(stream: &mut TcpStream) -> (HashMap<String, String>, Vec<u8
 
     for (pos, line) in request_lines.iter().enumerate(){
         if pos == 0 {
+            
             let parts = line.trim().split_whitespace().collect::<Vec<&str>>();
             request_parts.insert(String::from("method"), String::from(parts[0]));
             request_parts.insert(String::from("path"), String::from(parts[1]));
